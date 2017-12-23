@@ -114,6 +114,7 @@ lex
 	token BANG /'!'/
 	token DOLLAR /'$'/
 	token CARET /'^'/
+	token AT /'@'/
 	token PERCENT /'%'/
 	token PLUS /'+'/
 	token MINUS /'-'/
@@ -125,12 +126,12 @@ lex
 end
 
 lex
-	token CONS_DQ / '\"' /
-	token CONS_DQ_NL / '\n' /
-	token CONS_SQOPEN / '[' /
-	token CONS_SQCLOSE / ']' /
+	token LIT_DQ / '\"' /
+	token LIT_DQ_NL / '\n' /
+	token LIT_SQOPEN / '[' /
+	token LIT_SQCLOSE / ']' /
 
-	token dq_cons_data
+	token lit_dq_data
 		/ ( ^( '\n' | '\"' | '[' | ']' | '\\' ) | '\\' . any )+ /
 end
 
@@ -682,7 +683,7 @@ def opt_label
 |	[]
 
 def dq_lit_term
-	[CONS_DQ] | [CONS_DQ_NL]
+	[LIT_DQ] | [LIT_DQ_NL]
 
 def sq_lit_term
 	[CONS_SQ] | [CONS_SQ_NL]
@@ -702,8 +703,8 @@ def pattern_el
 |	[TILDE opt_tilde_data TILDE_NL] :Tilde
 
 def litpat_el
-	[dq_cons_data] :ConsData
-|	[CONS_SQOPEN PatternElList: pattern_el* CONS_SQCLOSE] :SubList
+	[lit_dq_data] :ConsData
+|	[LIT_SQOPEN PatternElList: pattern_el* LIT_SQCLOSE] :SubList
 
 def pattern_top_el
 	[DQ LitpatElList: litpat_el* dq_lit_term] :Dq
@@ -722,6 +723,10 @@ def pattern
 # Constructor List
 #
 
+def opt_no_trim
+	[AT] :At
+|	[] :Trim
+
 def E1 []
 def E2 []
 def E3 []
@@ -732,11 +737,11 @@ def cons_el
 |	[E1 DQ LitConsElList: lit_cons_el* dq_lit_term] :Dq
 |	[E1 SQ SqConsDataList: sq_cons_data* sq_lit_term] :Sq
 |	[E1 TILDE opt_tilde_data TILDE_NL] :Tilde
-|	[E2 code_expr] :CodeExpr
+|	[E2 opt_no_trim code_expr] :CodeExpr
 
 def lit_cons_el
-	[dq_cons_data] :ConsData
-|	[CONS_SQOPEN ConsElList: cons_el* CONS_SQCLOSE] :SubList
+	[lit_dq_data] :ConsData
+|	[LIT_SQOPEN ConsElList: cons_el* LIT_SQCLOSE] :SubList
 
 def cons_top_el
 	[DQ LitConsElList: lit_cons_el* dq_lit_term] :Dq
@@ -759,11 +764,11 @@ def accum_el
 	[E1 DQ LitAccumElList: lit_accum_el* dq_lit_term] :Dq
 |	[E1 SQ SqConsDataList: sq_cons_data* sq_lit_term] :Sq
 |	[E1 TILDE opt_tilde_data TILDE_NL] :Tilde
-|	[E2 code_expr] :CodeExpr
+|	[E2 opt_no_trim code_expr] :CodeExpr
 
 def lit_accum_el
-	[dq_cons_data] :ConsData
-|	[CONS_SQOPEN AccumElList: accum_el* CONS_SQCLOSE] :SubList
+	[lit_dq_data] :ConsData
+|	[LIT_SQOPEN AccumElList: accum_el* LIT_SQCLOSE] :SubList
 
 def accum_top_el
 	[DQ LitAccumElList: lit_accum_el* dq_lit_term] :Dq
@@ -786,11 +791,11 @@ def string_el
 	[E1 DQ LitStringElList: lit_string_el* dq_lit_term] :Dq
 |	[E1 SQ SqConsDataList: sq_cons_data* sq_lit_term] :Sq
 |	[E1 TILDE opt_tilde_data TILDE_NL] :Tilde
-|	[E2 code_expr] :CodeExpr
+|	[E2 opt_no_trim code_expr] :CodeExpr
 
 def lit_string_el
-	[dq_cons_data] :ConsData
-|	[CONS_SQOPEN StringElList: string_el* CONS_SQCLOSE] :SubList
+	[lit_dq_data] :ConsData
+|	[LIT_SQOPEN StringElList: string_el* LIT_SQCLOSE] :SubList
 
 def string_top_el
 	[DQ LitStringElList: lit_string_el* dq_lit_term] :Dq

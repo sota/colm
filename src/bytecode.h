@@ -1,24 +1,27 @@
 /*
- *  Copyright 2007-2012 Adrian Thurston <thurston@complang.org>
- */
-
-/*  This file is part of Colm.
+ * Copyright 2007-2016 Adrian Thurston <thurston@colm.net>
  *
- *  Colm is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- * 
- *  Colm is distributed in the hope that it will be useful, *  but WITHOUT ANY WARRANTY; without even the implied warranty of *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- * 
- *  You should have received a copy of the GNU General Public License
- *  along with Colm; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
-#ifndef _BYTECODE_H
-#define _BYTECODE_H
+#ifndef _COLM_BYTECODE_H
+#define _COLM_BYTECODE_H
 
 #include <colm/pdarun.h>
 #include <colm/type.h>
@@ -34,9 +37,6 @@ extern "C" {
 
 typedef unsigned long ulong;
 typedef unsigned char uchar;
-
-typedef unsigned long colm_value_t;
-
 
 #define IN_LOAD_INT              0x01
 #define IN_LOAD_STR              0x02
@@ -291,9 +291,9 @@ typedef unsigned long colm_value_t;
 #define IN_PCR_END_DECK          0xb3
 
 #define IN_OPEN_FILE             0xb4
-#define IN_GET_STDIN             0xb5
-#define IN_GET_STDOUT            0xb6
-#define IN_GET_STDERR            0xb7
+
+#define IN_GET_CONST             0xb5
+
 #define IN_TO_UPPER              0xb9
 #define IN_TO_LOWER              0xba
 
@@ -357,6 +357,15 @@ typedef unsigned long colm_value_t;
 
 #define IN_NEW_STREAM            0x24
 #define IN_GET_COLLECT_STRING    0x68
+
+/*
+ * Const things to get.
+ */
+#define IN_CONST_STDIN           0x10
+#define IN_CONST_STDOUT          0x11
+#define IN_CONST_STDERR          0x12
+#define IN_CONST_ARG             0x13
+
 
 /*
  * IN_FN instructions.
@@ -428,7 +437,7 @@ typedef unsigned long colm_value_t;
 enum GEN {
 	GEN_PARSER   = 0x14,
 	GEN_LIST     = 0x15,
-	GEN_MAP      = 0x16,
+	GEN_MAP      = 0x16
 };
 
 /* Known language element ids. */
@@ -668,4 +677,5 @@ code_t *colm_pop_reverse_code( struct rt_code_vect *all_rev );
 }
 #endif
 
-#endif
+#endif /* _COLM_BYTECODE_H */
+

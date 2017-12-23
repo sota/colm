@@ -1,5 +1,27 @@
-#ifndef __COLM_COLM_H
-#define __COLM_COLM_H
+/*
+ * Copyright 2006-2016 Adrian Thurston <thurston@colm.net>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#ifndef _COLM_COLM_H
+#define _COLM_COLM_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -96,6 +118,9 @@ void colm_set_debug( struct colm_program *prg, long active_realm );
 /* Run a top-level colm program. */
 void colm_run_program( struct colm_program *prg, int argc, const char **argv );
 
+/* Run a top-level colm program, with argument lengths (allows binary data). */
+void colm_run_program2( struct colm_program *prg, int argc, const char **argv, const int *argl );
+
 /* Run a single exported colm function. */
 struct colm_tree *colm_run_func( struct colm_program *prg, int frame_id,
 		const char **params, int param_count );
@@ -104,7 +129,10 @@ struct colm_tree *colm_run_func( struct colm_program *prg, int frame_id,
 int colm_delete_program( struct colm_program *prg );
 
 /* Set the pointer to the reduce struct used. */
+void *colm_get_reduce_ctx( struct colm_program *prg );
 void colm_set_reduce_ctx( struct colm_program *prg, void *ctx );
+
+const char *colm_error( struct colm_program *prg, int *length );
 
 const char **colm_extract_fns( struct colm_program *prg );
 
@@ -112,4 +140,5 @@ const char **colm_extract_fns( struct colm_program *prg );
 }
 #endif
 
-#endif
+#endif /* _COLM_COLM_H */
+

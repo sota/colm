@@ -1,28 +1,31 @@
 /*
- *  Copyright 2012 Adrian Thurston <thurston@complang.org>
- */
-
-/*  This file is part of Colm.
+ * Copyright 2012 Adrian Thurston <thurston@colm.net>
  *
- *  Colm is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- * 
- *  Colm is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- * 
- *  You should have received a copy of the GNU General Public License
- *  along with Colm; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
-#include "bytecode.h"
-#include "compiler.h"
-#include <iostream>
+#include <stdbool.h>
 #include <assert.h>
+
+#include <iostream>
+
+#include "compiler.h"
 
 void Compiler::initUniqueTypes( )
 {
@@ -1026,6 +1029,7 @@ void Compiler::declareGlobalFields()
 	addStderr();
 	addArgv();
 	addError();
+	addDefineArgs();
 }
 
 void Compiler::addStdin()
@@ -1036,13 +1040,19 @@ void Compiler::addStdin()
 	/* Create the field and insert it into the map. */
 	ObjectField *el = ObjectField::cons( internal,
 			ObjectField::InbuiltFieldType, typeRef, "stdin" );
+
 	el->isConst = true;
-	el->inGetR     = IN_GET_STDIN;
-	el->inGetWC    = IN_GET_STDIN;
-	el->inGetWV    = IN_GET_STDIN;
-	el->inGetValR   = IN_GET_STDIN;
-	el->inGetValWC  = IN_GET_STDIN;
-	el->inGetValWV  = IN_GET_STDIN;
+
+	el->inGetR      = IN_GET_CONST;
+	el->inGetWC     = IN_GET_CONST;
+	el->inGetWV     = IN_GET_CONST;
+	el->inGetValR   = IN_GET_CONST;
+	el->inGetValWC  = IN_GET_CONST;
+	el->inGetValWV  = IN_GET_CONST;
+
+	el->isConstVal = true;
+	el->constValId  = IN_CONST_STDIN;
+
 	rootNamespace->rootScope->insertField( el->name, el );
 }
 
@@ -1055,13 +1065,17 @@ void Compiler::addStdout()
 	ObjectField *el = ObjectField::cons( internal,
 			ObjectField::InbuiltFieldType, typeRef, "stdout" );
 	el->isConst = true;
-	el->inGetR     = IN_GET_STDOUT;
-	el->inGetWC    = IN_GET_STDOUT;
-	el->inGetWV    = IN_GET_STDOUT;
 
-	el->inGetValR   = IN_GET_STDOUT;
-	el->inGetValWC  = IN_GET_STDOUT;
-	el->inGetValWV  = IN_GET_STDOUT;
+	el->inGetR      = IN_GET_CONST;
+	el->inGetWC     = IN_GET_CONST;
+	el->inGetWV     = IN_GET_CONST;
+	el->inGetValR   = IN_GET_CONST;
+	el->inGetValWC  = IN_GET_CONST;
+	el->inGetValWV  = IN_GET_CONST;
+
+	el->isConstVal = true;
+	el->constValId  = IN_CONST_STDOUT;
+
 	rootNamespace->rootScope->insertField( el->name, el );
 }
 
@@ -1074,13 +1088,17 @@ void Compiler::addStderr()
 	ObjectField *el = ObjectField::cons( internal,
 			ObjectField::InbuiltFieldType, typeRef, "stderr" );
 	el->isConst = true;
-	el->inGetR     = IN_GET_STDERR;
-	el->inGetWC    = IN_GET_STDERR;
-	el->inGetWV    = IN_GET_STDERR;
 
-	el->inGetValR   = IN_GET_STDERR;
-	el->inGetValWC  = IN_GET_STDERR;
-	el->inGetValWV  = IN_GET_STDERR;
+	el->inGetR      = IN_GET_CONST;
+	el->inGetWC     = IN_GET_CONST;
+	el->inGetWV     = IN_GET_CONST;
+	el->inGetValR   = IN_GET_CONST;
+	el->inGetValWC  = IN_GET_CONST;
+	el->inGetValWV  = IN_GET_CONST;
+
+	el->isConstVal = true;
+	el->constValId  = IN_CONST_STDERR;
+
 	rootNamespace->rootScope->insertField( el->name, el );
 }
 
@@ -1115,6 +1133,32 @@ void Compiler::addError()
 	el->inGetWC    = IN_GET_ERROR;
 	el->inGetWV    = IN_GET_ERROR;
 	rootNamespace->rootScope->insertField( el->name, el );
+}
+
+void Compiler::addDefineArgs()
+{
+	for ( DefineVector::Iter d = defineArgs; d.lte(); d++ ) {
+		TypeRef *typeRef = TypeRef::cons( internal, uniqueTypeStr );
+
+		/* Create the field and insert it into the map. */
+		ObjectField *el = ObjectField::cons( internal,
+				ObjectField::InbuiltFieldType, typeRef, d->name );
+
+		el->isConst = true;
+
+		el->inGetR      = IN_GET_CONST;
+		el->inGetWC     = IN_GET_CONST;
+		el->inGetWV     = IN_GET_CONST;
+		el->inGetValR   = IN_GET_CONST;
+		el->inGetValWC  = IN_GET_CONST;
+		el->inGetValWV  = IN_GET_CONST;
+
+		el->isConstVal = true;
+		el->constValId = IN_CONST_ARG;
+		el->constValArg = d->value;
+
+		rootNamespace->rootScope->insertField( el->name, el );
+	}
 }
 
 void Compiler::initMapFunctions( GenericType *gen )

@@ -1,34 +1,45 @@
 /*
- *  Copyright 2007-2012 Adrian Thurston <thurston@complang.org>
- */
-
-/*  This file is part of Colm.
+ * Copyright 2007-2012 Adrian Thurston <thurston@colm.net>
  *
- *  Colm is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- * 
- *  Colm is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- * 
- *  You should have received a copy of the GNU General Public License
- *  along with Colm; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
-#include "bytecode.h"
-#include "compiler.h"
-#include "pdarun.h"
-#include "input.h"
-#include <iostream>
 #include <assert.h>
+#include <stdbool.h>
+
+#include <iostream>
+
+#include "compiler.h"
 
 using std::cout;
 using std::cerr;
 using std::endl;
+
+bool isStr( UniqueType *ut )
+{
+	return ut->typeId == TYPE_TREE && ut->langEl != 0 && ut->langEl->id == LEL_ID_STR;
+}
+
+bool isTree( UniqueType *ut )
+{
+	return ut->typeId == TYPE_TREE;
+}
 
 IterDef::IterDef( Type type )
 : 
@@ -427,6 +438,19 @@ UniqueType *LangVarRef::loadField( Compiler *pd, CodeVect &code,
 		for ( Vector<RhsVal>::Iter rg = el->rhsVal; rg.lte(); rg++ ) {
 			code.append( rg->prodEl->production->prodNum );
 			code.append( rg->prodEl->pos );
+		}
+	}
+
+	if ( el->isConstVal ) {
+		code.appendHalf( el->constValId );
+
+		if ( el->constValId == IN_CONST_ARG ) {
+			/* Make sure we have this string. */
+			StringMapEl *mapEl = 0;
+			if ( pd->literalStrings.insert( el->constValArg, &mapEl ) )
+				mapEl->value = pd->literalStrings.length()-1;
+
+			code.appendWord( mapEl->value );
 		}
 	}
 
@@ -1158,6 +1182,7 @@ UniqueType *LangVarRef::evaluateCall( Compiler *pd, CodeVect &code, CallArgVect 
 	return lookup.uniqueType;
 }
 
+/* Can match on a tree or a ref. A tree always comes back. */
 UniqueType *LangTerm::evaluateMatch( Compiler *pd, CodeVect &code ) const
 {
 	/* Add the vars bound by the pattern into the local scope. */
@@ -1191,6 +1216,10 @@ UniqueType *LangTerm::evaluateMatch( Compiler *pd, CodeVect &code ) const
 					lookup.objField, exprType, false );
 		}
 	}
+
+	/* The process of matching turns refs into trees. */
+	if ( ut->typeId == TYPE_REF )
+		ut = pd->findUniqueType( TYPE_TREE, ut->langEl );
 
 	return ut;
 }
@@ -1324,6 +1353,11 @@ UniqueType *LangTerm::evaluateConstruct( Compiler *pd, CodeVect &code ) const
 			if ( ut->typeId != TYPE_TREE ) {
 				error(constructor->loc) << "variables used in "
 						"replacements must be trees" << endp;
+			}
+
+			if ( !isStr( ut ) ) {
+				if ( item->trim ) 
+					code.append( IN_TREE_TRIM );
 			}
 
 			item->langEl = ut->langEl;
@@ -1582,6 +1616,10 @@ void ConsItemList::evaluateSendStream( Compiler *pd, CodeVect &code )
 				code.append( IN_POP_TREE );
 				code.append( IN_POP_TREE );
 				continue;
+			}
+			else if ( ut->typeId == TYPE_TREE && !isStr( ut ) ) {
+				if ( item->trim )
+					code.append( IN_TREE_TRIM );
 			}
 
 			if ( ut->typeId == TYPE_INT || ut->typeId == TYPE_BOOL )
@@ -2486,6 +2524,9 @@ void LangStmt::compile( Compiler *pd, CodeVect &code ) const
 				{
 					code.append( IN_INT_TO_STR );
 				}
+				else if ( isTree( types[pex.pos()] ) && !isStr( types[pex.pos()] ) ) {
+					code.append( IN_TREE_TRIM );
+				}
 			}
 
 			/* Run the printing forwards. */
@@ -2513,7 +2554,8 @@ void LangStmt::compile( Compiler *pd, CodeVect &code ) const
 		}
 		case PrintAccum: {
 			code.append( IN_LOAD_GLOBAL_R );
-			code.append( IN_GET_STDOUT );
+			code.append(     IN_GET_CONST );
+			code.appendHalf( IN_CONST_STDOUT );
 			consItemList->evaluateSendStream( pd, code );
 			code.append( IN_POP_TREE );
 			break;

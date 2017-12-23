@@ -1,42 +1,45 @@
 /*
- *  Copyright 2006-2012 Adrian Thurston <thurston@complang.org>
- */
-
-/*  This file is part of Colm.
+ * Copyright 2006-2012 Adrian Thurston <thurston@colm.net>
  *
- *  Colm is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- * 
- *  Colm is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- * 
- *  You should have received a copy of the GNU General Public License
- *  along with Colm; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
-#ifndef _PARSETREE_H
-#define _PARSETREE_H
+#ifndef _COLM_PARSETREE_H
+#define _COLM_PARSETREE_H
 
 #include <iostream>
 #include <string.h>
 #include <string>
 
+#include <avlbasic.h>
+#include <avlmap.h>
+#include <bstmap.h>
+#include <bstset.h>
+#include <vector.h>
+#include <dlist.h>
+#include <dlistval.h>
+#include <dlistmel.h>
+
 #include "global.h"
-#include "avlmap.h"
-#include "bstmap.h"
-#include "bstset.h"
-#include "vector.h"
-#include "dlist.h"
-#include "dlistval.h"
-#include "dlistmel.h"
 #include "cstring.h"
 #include "bytecode.h"
-#include "avlbasic.h"
+
 
 /* Operators that are represented with single symbol characters. */
 #define OP_DoubleEql 'e'
@@ -220,7 +223,7 @@ struct LangEl;
 enum AugType
 {
 	at_start,
-	at_leave,
+	at_leave
 };
 
 struct Action;
@@ -1300,7 +1303,7 @@ struct LexFactor
 		OrExprType,
 		RegExprType, 
 		ReferenceType,
-		ParenType,
+		ParenType
 	}; 
 	
 	LexFactor()
@@ -1735,7 +1738,8 @@ struct ConsItem
 		expr(0),
 		langEl(0),
 		prodEl(0),
-		bindId(-1)
+		bindId(-1),
+		trim(false)
 	{
 	}
 
@@ -1748,12 +1752,13 @@ struct ConsItem
 		return r;
 	}
 
-	static ConsItem *cons( const InputLoc &loc, Type type, LangExpr *expr )
+	static ConsItem *cons( const InputLoc &loc, Type type, LangExpr *expr, bool trim )
 	{
 		ConsItem *r = new ConsItem;
 		r->loc = loc;
 		r->type = type;
 		r->expr = expr;
+		r->trim = trim;
 		return r;
 	}
 
@@ -1774,6 +1779,7 @@ struct ConsItem
 	LangEl *langEl;
 	ProdEl *prodEl;
 	long bindId;
+	bool trim;
 	ConsItem *prev, *next;
 };
 
@@ -1793,6 +1799,7 @@ struct ConsItemList
 		return new ConsItemList;
 	}
 
+	void resolve( Compiler *pd );
 	void evaluateSendStream( Compiler *pd, CodeVect &code );
 };
 
@@ -2075,7 +2082,7 @@ enum RepeatType {
 	RepeatNone = 1,
 	RepeatRepeat,
 	RepeatList,
-	RepeatOpt,
+	RepeatOpt
 };
 
 /*
@@ -2512,6 +2519,7 @@ struct ObjectField
 		isConst(false), 
 		refActive(false),
 		isExport(false),
+		isConstVal(false),
 		useGenericId(false),
 		generic(0),
 		mapKeyField(0),
@@ -2584,9 +2592,16 @@ struct ObjectField
 	NameScope *scope;
 	long offset;
 	bool beenReferenced;
+	/* Declared const. */
 	bool isConst;
 	bool refActive;
 	bool isExport;
+
+	/* Value is a const thing when that retrieved by the runtime. Requires a
+	 * const val id. */
+	bool isConstVal;
+	int constValId;
+	String constValArg;
 
 	bool useGenericId;
 	GenericType *generic;
@@ -2871,7 +2886,7 @@ struct LangTerm
 		MakeTreeType,
 		MakeTokenType,
 		EmbedStringType,
-		CastType,
+		CastType
 	};
 
 	LangTerm()
@@ -3517,4 +3532,5 @@ struct Function
 
 typedef DList<Function> FunctionList;
 
-#endif /* _PARSETREE_H */
+#endif /* _COLM_PARSETREE_H */
+

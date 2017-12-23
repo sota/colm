@@ -1,45 +1,47 @@
 /*
- *  Copyright 2001-2012 Adrian Thurston <thurston@complang.org>
- */
-
-/*  This file is part of Colm.
+ * Copyright 2001-2012 Adrian Thurston <thurston@colm.net>
  *
- *  Colm is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- * 
- *  Colm is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- * 
- *  You should have received a copy of the GNU General Public License
- *  along with Colm; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
-#ifndef _PARSEDATA_H
-#define _PARSEDATA_H
+#ifndef _COLM_PARSEDATA_H
+#define _COLM_PARSEDATA_H
+
+#include <limits.h>
 
 #include <iostream>
-#include <limits.h>
-#include "bstset.h"
+
+#include <avlmap.h>
+#include <avlset.h>
+#include <bstmap.h>
+#include <vector.h>
+#include <bstset.h>
+#include <dlist.h>
+#include <dlistmel.h>
+#include <fsmgraph.h>
+#include <compare.h>
+
 #include "global.h"
-#include "avlmap.h"
-#include "avlset.h"
-#include "bstmap.h"
-#include "vector.h"
-#include "dlist.h"
-#include "dlistmel.h"
-#include "fsmgraph.h"
-#include "compare.h"
-#include "vector.h"
 #include "keyops.h"
 #include "parsetree.h"
 #include "cstring.h"
 #include "pdagraph.h"
-#include "compare.h"
 #include "pdarun.h"
 #include "bytecode.h"
 #include "program.h"
@@ -79,6 +81,18 @@ struct IncludeStackItem
 typedef Vector<IncludeStackItem> IncludeStack;
 typedef Vector<const char *> ArgsVector;
 
+struct DefineArg
+{
+	DefineArg( String name, String value )
+		: name(name), value(value) {}
+
+	String name;
+	String value;
+};
+
+typedef Vector<DefineArg> DefineVector;
+
+extern DefineVector defineArgs;
 extern ArgsVector includePaths;
 
 inline long makeReduceCode( long reduction, bool isShiftReduce )
@@ -787,6 +801,7 @@ struct Compiler
 	void addStderr();
 	void addArgv();
 	void addError();
+	void addDefineArgs();
 	int argvOffset();
 	int arg0Offset();
 	void makeDefaultIterators();
@@ -1093,5 +1108,5 @@ ObjectMethod *initFunction( UniqueType *retType, Namespace *nspace, ObjectDef *o
 		UniqueType *arg1, UniqueType *arg2, bool isConst,
 		bool useFnInstr = false, GenericType *useGeneric = 0 );
 
+#endif /* _COLM_PARSEDATA_H */
 
-#endif /* _PARSEDATA_H */

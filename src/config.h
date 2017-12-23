@@ -2,7 +2,7 @@
 /* src/config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* enable debug statements */
-#define DEBUG 1
+/* #undef DEBUG */
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
@@ -34,8 +34,7 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #define HAVE_UNISTD_H 1
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
 #define LT_OBJDIR ".libs/"
 
 /* Name of package */
@@ -48,7 +47,7 @@
 #define PACKAGE_NAME "colm"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "colm 0.13.0.4"
+#define PACKAGE_STRING "colm 0.13.0.5"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "colm"
@@ -57,7 +56,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "0.13.0.4"
+#define PACKAGE_VERSION "0.13.0.5"
 
 /* allocate pool objects with malloc */
 /* #undef POOL_MALLOC */
@@ -69,4 +68,4 @@
 #define STDC_HEADERS 1
 
 /* Version number of package */
-#define VERSION "0.13.0.4"
+#define VERSION "0.13.0.5"

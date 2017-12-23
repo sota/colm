@@ -1,41 +1,38 @@
 /*
- *  Copyright 2006-2016 Adrian Thurston <thurston@complang.org>
- */
-
-/*  This file is part of Colm.
+ * Copyright 2006-2016 Adrian Thurston <thurston@colm.net>
  *
- *  Colm is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- * 
- *  Colm is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- * 
- *  You should have received a copy of the GNU General Public License
- *  along with Colm; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
-#include <colm/pdarun.h>
-#include <colm/tree.h>
 #include <colm/bytecode.h>
-#include <colm/pool.h>
-#include <colm/debug.h>
-#include <colm/config.h>
-#include <colm/struct.h>
 
-#include <alloca.h>
-#include <sys/mman.h>
-#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <assert.h>
+#include <string.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <signal.h>
 
-typedef struct colm_struct struct_t;
+#include <colm/pool.h>
+#include <colm/debug.h>
 
 #define TRUE_VAL  1
 #define FALSE_VAL 0
@@ -43,9 +40,6 @@ typedef struct colm_struct struct_t;
 #if SIZEOF_LONG != 4 && SIZEOF_LONG != 8 
 	#error "SIZEOF_LONG contained an unexpected value"
 #endif
-
-#define true 1
-#define false 0
 
 #define read_byte( i ) do { \
 	i = ((uchar) *instr++); \
@@ -337,23 +331,25 @@ static void downref_locals( program_t *prg, tree_t ***psp,
 	}
 }
 
-static tree_t *construct_arg0( program_t *prg, int argc, const char **argv )
+static tree_t *construct_arg0( program_t *prg, int argc, const char **argv, const int *argl )
 {
 	tree_t *arg0 = 0;
 	if ( argc > 0 ) {
-		head_t *head = colm_string_alloc_pointer( prg, argv[0], strlen(argv[0]) );
+		size_t len = argl != 0 ? argl[0] : strlen(argv[0]);
+		head_t *head = colm_string_alloc_pointer( prg, argv[0], len );
 		arg0 = construct_string( prg, head );
 		colm_tree_upref( arg0 );
 	}
 	return arg0;
 }
 
-static list_t *construct_argv( program_t *prg, int argc, const char **argv )
+static list_t *construct_argv( program_t *prg, int argc, const char **argv, const int *argl )
 {
 	list_t *list = (list_t*)colm_construct_generic( prg, prg->rtd->argv_generic_id );
 	int i;
 	for ( i = 1; i < argc; i++ ) {
-		head_t *head = colm_string_alloc_pointer( prg, argv[i], strlen(argv[i]) );
+		size_t len = argl != 0 ? argl[i] : strlen(argv[i]);
+		head_t *head = colm_string_alloc_pointer( prg, argv[i], len );
 		tree_t *arg = construct_string( prg, head );
 		colm_tree_upref( arg );
 
@@ -434,6 +430,7 @@ tree_t *colm_run_func( struct colm_program *prg, int frame_id,
 	/* Make the arguments available to the program. */
 	prg->argc = 0;
 	prg->argv = 0;
+	prg->argl = 0;
 
 	Execution execution;
 	memset( &execution, 0, sizeof(execution) );
@@ -2292,7 +2289,7 @@ again:
 			struct stream_impl *si = stream->impl;
 
 			if ( si->file != 0 ) {
-				fclose( si->file );
+				colm_close_stream_file( si->file );
 				si->file = 0;
 			}
 
@@ -3635,36 +3632,59 @@ again:
 			colm_tree_downref( prg, sp, mode );
 			break;
 		}
-		case IN_GET_STDIN: {
-			debug( prg, REALM_BYTECODE, "IN_GET_STDIN\n" );
+		case IN_GET_CONST: {
+			short constValId;
+			read_half( constValId );
 
-			/* Pop the root object. */
-			vm_pop_tree();
-			if ( prg->stdin_val == 0 )
-				prg->stdin_val = colm_stream_open_fd( prg, "<stdin>", 0 );
+			switch ( constValId ) {
+				case IN_CONST_STDIN: {
+					debug( prg, REALM_BYTECODE, "IN_CONST_STDIN\n" );
 
-			vm_push_stream( prg->stdin_val );
-			break;
-		}
-		case IN_GET_STDOUT: {
-			debug( prg, REALM_BYTECODE, "IN_GET_STDOUT\n" );
+					/* Pop the root object. */
+					vm_pop_tree();
+					if ( prg->stdin_val == 0 )
+						prg->stdin_val = colm_stream_open_fd( prg, "<stdin>", 0 );
 
-			/* Pop the root object. */
-			vm_pop_tree();
-			open_stdout( prg );
+					vm_push_stream( prg->stdin_val );
+					break;
+				}
+				case IN_CONST_STDOUT: {
+					debug( prg, REALM_BYTECODE, "IN_CONST_STDOUT\n" );
 
-			vm_push_stream( prg->stdout_val );
-			break;
-		}
-		case IN_GET_STDERR: {
-			debug( prg, REALM_BYTECODE, "IN_GET_STDERR\n" );
+					/* Pop the root object. */
+					vm_pop_tree();
+					open_stdout( prg );
 
-			/* Pop the root object. */
-			vm_pop_tree();
-			if ( prg->stderr_val == 0 )
-				prg->stderr_val = colm_stream_open_fd( prg, "<stderr>", 2 );
+					vm_push_stream( prg->stdout_val );
+					break;
+				}
+				case IN_CONST_STDERR: {
+					debug( prg, REALM_BYTECODE, "IN_CONST_STDERR\n" );
 
-			vm_push_stream( prg->stderr_val );
+					/* Pop the root object. */
+					vm_pop_tree();
+					if ( prg->stderr_val == 0 )
+						prg->stderr_val = colm_stream_open_fd( prg, "<stderr>", 2 );
+
+					vm_push_stream( prg->stderr_val );
+					break;
+				}
+				case IN_CONST_ARG: {
+					word_t offset;
+					read_word( offset );
+
+					debug( prg, REALM_BYTECODE, "IN_CONST_ARG %d\n", offset );
+
+					/* Pop the root object. */
+					vm_pop_tree();
+
+					head_t *lit = make_literal( prg, offset );
+					tree_t *tree = construct_string( prg, lit );
+					colm_tree_upref( tree );
+					vm_push_tree( tree );
+					break;
+				}
+			}
 			break;
 		}
 		case IN_SYSTEM: {
@@ -3792,7 +3812,7 @@ again:
 				debug( prg, REALM_BYTECODE, "IN_LOAD_ARG0 %lu\n", field );
 
 				/* tree_t comes back upreffed. */
-				tree_t *tree = construct_arg0( prg, prg->argc, prg->argv );
+				tree_t *tree = construct_arg0( prg, prg->argc, prg->argv, prg->argl );
 				tree_t *prev = colm_struct_get_field( prg->global, tree_t*, field );
 				colm_tree_downref( prg, sp, prev );
 				colm_struct_set_field( prg->global, tree_t*, field, tree );
@@ -3803,7 +3823,7 @@ again:
 				read_half( field );
 				debug( prg, REALM_BYTECODE, "IN_LOAD_ARGV %lu\n", field );
 
-				list_t *list = construct_argv( prg, prg->argc, prg->argv );
+				list_t *list = construct_argv( prg, prg->argc, prg->argv, prg->argl );
 				colm_struct_set_field( prg->global, list_t*, field, list );
 				break;
 			}

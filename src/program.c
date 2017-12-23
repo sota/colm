@@ -1,23 +1,29 @@
 /*
- *  Copyright 2006-2012 Adrian Thurston <thurston@complang.org>
+ * Copyright 2006-2012 Adrian Thurston <thurston@colm.net>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
-/*  This file is part of Colm.
- *
- *  Colm is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- * 
- *  Colm is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- * 
- *  You should have received a copy of the GNU General Public License
- *  along with Colm; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
- */
+#include <sys/mman.h>
+#include <string.h>
+#include <assert.h>
+#include <stdlib.h>
 
 #include <colm/pdarun.h>
 #include <colm/tree.h>
@@ -26,12 +32,6 @@
 #include <colm/debug.h>
 #include <colm/config.h>
 #include <colm/struct.h>
-
-#include <alloca.h>
-#include <sys/mman.h>
-#include <string.h>
-#include <assert.h>
-#include <stdlib.h>
 
 #define VM_STACK_SIZE (8192)
 
@@ -201,7 +201,7 @@ program_t *colm_new_program( struct colm_sections *rtd )
 	return prg;
 }
 
-void colm_run_program( program_t *prg, int argc, const char **argv )
+void colm_run_program2( program_t *prg, int argc, const char **argv, const int *argl )
 {
 	if ( prg->rtd->root_code_len == 0 )
 		return;
@@ -209,6 +209,7 @@ void colm_run_program( program_t *prg, int argc, const char **argv )
 	/* Make the arguments available to the program. */
 	prg->argc = argc;
 	prg->argv = argv;
+	prg->argl = argl;
 
 	Execution execution;
 	memset( &execution, 0, sizeof(execution) );
@@ -221,6 +222,11 @@ void colm_run_program( program_t *prg, int argc, const char **argv )
 	prg->argv = 0;
 }
 
+void colm_run_program( program_t *prg, int argc, const char **argv )
+{
+	colm_run_program2( prg, argc, argv, 0 );
+}
+
 static void colm_clear_heap( program_t *prg, tree_t **sp )
 {
 	struct colm_struct *hi = prg->heap.head;
@@ -229,6 +235,11 @@ static void colm_clear_heap( program_t *prg, tree_t **sp )
 		colm_struct_delete( prg, sp, hi );
 		hi = next;
 	}
+}
+
+void *colm_get_reduce_ctx( struct colm_program *prg )
+{
+	return prg->red_ctx;
 }
 
 void colm_set_reduce_ctx( struct colm_program *prg, void *ctx )
@@ -241,6 +252,17 @@ const char **colm_extract_fns( struct colm_program *prg )
 	const char **fns = prg->stream_fns;
 	prg->stream_fns = 0;
 	return fns;
+}
+
+const char *colm_error( struct colm_program *prg, int *length )
+{
+	const char *rtn = 0;
+	if ( prg->error != 0 ) {
+		rtn = prg->error->tokdata->data;
+		if ( length != 0 )
+			*length = prg->error->tokdata->length;
+	}
+	return rtn;
 }
 
 int colm_delete_program( program_t *prg )
@@ -292,7 +314,7 @@ int colm_delete_program( program_t *prg )
 	vm_clear( prg );
 
 	if ( prg->stream_fns ) {
-		char **ptr = prg->stream_fns;
+		char **ptr = (char**)prg->stream_fns;
 		while ( *ptr != 0 ) {
 			free( *ptr );
 			ptr += 1;

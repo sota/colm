@@ -1,46 +1,39 @@
 /*
- *  Copyright 2006-2012 Adrian Thurston <thurston@complang.org>
- */
-
-/*  This file is part of Colm.
+ * Copyright 2006-2016 Adrian Thurston <thurston@colm.net>
  *
- *  Colm is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- * 
- *  Colm is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- * 
- *  You should have received a copy of the GNU General Public License
- *  along with Colm; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
-#include <iostream>
-#include <fstream>
-#include <unistd.h>
-#include <sstream>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include <iostream>
 
-#include "global.h"
 #include "debug.h"
 #include "pcheck.h"
-#include "vector.h"
 #include "version.h"
-#include "keyops.h"
 #include "compiler.h"
-#include "vector.h"
-#include "version.h"
-#include "fsmcodegen.h"
-#include "colm.h"
 
 #if defined(CONS_INIT)
 #include "consinit.h"
@@ -97,7 +90,9 @@ bool gblLibrary = false;
 long gblActiveRealm = 0;
 
 ArgsVector includePaths;
-ArgsVector additionalCodeFiles;;
+ArgsVector libraryPaths;
+DefineVector defineArgs;
+ArgsVector additionalCodeFiles;
 
 /* Print version information. */
 void version();
@@ -153,7 +148,7 @@ ostream &warning( )
 ostream &warning( const InputLoc &loc )
 {
 	assert( inputFn != 0 );
-	cerr << "warning: " << inputFn << ":" << 
+	cerr << "warning: " << inputFn << ":" <<
 			loc.line << ":" << loc.col << ": ";
 	return cerr;
 }
@@ -181,20 +176,32 @@ void usage()
 "general:\n"
 "   -h, -H, -?, --help   print this usage and exit\n"
 "   -v --version         print version information and exit\n"
-"   -o <file>            write output to <file>\n"
-"   -c                   compile only (don't produce binary)\n"
+"   -b <file>            write binary to <file>\n"
+"   -o <file>            write object to <file>\n"
 "   -e <file>            write C++ export header to <file>\n"
 "   -x <file>            write C++ export code to <file>\n"
 "   -m <file>            write C++ commit code to <file>\n"
 "   -a <file>            additional code file to include in output program\n"
-	;	
+"   -E N=V               set a string value availabe in the program\n"
+"   -I <path>            additional include path for the compiler\n"
+"   -i                   activate branchpoint information\n"
+"   -L <path>            additional library path for the linker\n"
+"   -l                   activate logging\n"
+"   -c                   compile only (don't produce binary)\n"
+"   -V                   print dot format (graphiz)\n"
+"   -d                   print verbose debug information\n"
+#if DEBUG
+"   -D <tag>             print more information about <tag>\n"
+"                        (BYTECODE|PARSE|MATCH|COMPILE|POOL|PRINT|INPUT|SCAN\n"
+#endif
+	;
 }
 
 /* Print version information. */
 void version()
 {
 	cout << "Colm version " VERSION << " " PUBDATE << endl <<
-			"Copyright (c) 2007-2012 by Adrian D. Thurston" << endl;
+			"Copyright (c) 2007-2016 by Adrian D. Thurston" << endl;
 }
 
 /* Scans a string looking for the file extension. If there is a file
@@ -218,9 +225,9 @@ const char *findFileExtension( const char *stemFile )
 			break;
 		}
 		ppos--;
-	} 
+	}
 
-	/* If we got to the front of the string then bail we 
+	/* If we got to the front of the string then bail we
 	 * did not find an extension  */
 	if ( ppos == stemFile )
 		ppos = 0;
@@ -266,14 +273,14 @@ void openOutputCompiled()
 	if ( binaryFn != 0 && inputFn != 0 &&
 			strcmp( inputFn, binaryFn  ) == 0 )
 	{
-		error() << "output file \"" << binaryFn  << 
+		error() << "output file \"" << binaryFn  <<
 				"\" is the same as the input file" << endl;
 	}
 
 	if ( intermedFn != 0 && inputFn != 0 &&
 			strcmp( inputFn, intermedFn  ) == 0 )
 	{
-		error() << "intermediate file \"" << intermedFn  << 
+		error() << "intermediate file \"" << intermedFn  <<
 				"\" is the same as the input file" << endl;
 	}
 
@@ -303,7 +310,7 @@ void openOutputLibrary()
 	if ( outputFn != 0 && inputFn != 0 &&
 			strcmp( inputFn, outputFn  ) == 0 )
 	{
-		error() << "output file \"" << outputFn  << 
+		error() << "output file \"" << outputFn  <<
 				"\" is the same as the input file" << endl;
 	}
 
@@ -328,7 +335,7 @@ void openExports( )
 {
 	/* Make sure we are not writing to the same file as the input file. */
 	if ( inputFn != 0 && exportHeaderFn != 0 && strcmp( inputFn, exportHeaderFn  ) == 0 ) {
-		error() << "output file \"" << exportHeaderFn  << 
+		error() << "output file \"" << exportHeaderFn  <<
 				"\" is the same as the input file" << endl;
 	}
 
@@ -353,7 +360,7 @@ void openExportsImpl( )
 {
 	/* Make sure we are not writing to the same file as the input file. */
 	if ( inputFn != 0 && exportCodeFn != 0 && strcmp( inputFn, exportCodeFn  ) == 0 ) {
-		error() << "output file \"" << exportCodeFn  << 
+		error() << "output file \"" << exportCodeFn  <<
 				"\" is the same as the input file" << endl;
 	}
 
@@ -378,7 +385,7 @@ void openCommit( )
 {
 	/* Make sure we are not writing to the same file as the input file. */
 	if ( inputFn != 0 && commitCodeFn != 0 && strcmp( inputFn, commitCodeFn  ) == 0 ) {
-		error() << "output file \"" << commitCodeFn  << 
+		error() << "output file \"" << commitCodeFn  <<
 				"\" is the same as the input file" << endl;
 	}
 
@@ -401,89 +408,80 @@ void openCommit( )
 
 void compileOutputCommand( const char *command )
 {
-	//cout << "compiling with: " << command << endl;
+	if ( verbose )
+		cout << "compiling with: '" << command << "'" << endl;
 	int res = system( command );
 	if ( res != 0 )
 		error() << "there was a problem compiling the output" << endl;
 }
 
-void compileOutputInstalled( const char *argv0 )
+void compileOutput( const char *argv0, const bool installed )
 {
 	/* Find the location of the colm program that is executing. */
 	char *location = strdup( argv0 );
-	char *last = location + strlen(location) - 1;
-	while ( true ) {
-		if ( last == location ) {
-			last[0] = '.';
-			last[1] = 0;
-			break;
+	char *last;
+	int length = 1024 + strlen( intermedFn ) + strlen( binaryFn );
+	if ( installed ) {
+		last = location + strlen( location ) - 1;
+		while ( true ) {
+			if ( last == location ) {
+				last[0] = '.';
+				last[1] = 0;
+				break;
+			}
+			if ( *last == '/' ) {
+				last[0] = 0;
+				break;
+			}
+			last -= 1;
 		}
-		if ( *last == '/' ) {
-			last[0] = 0;
-			break;
-		}
-		last -= 1;
+	} else {
+		last = strrchr( location, '/' );
+		assert( last != 0 );
+		last[0] = 0;
+		length += 3 * strlen( location );
 	}
-
-
-	int length = 1024 + strlen(intermedFn) + strlen(binaryFn);
-
 	for ( ArgsVector::Iter af = additionalCodeFiles; af.lte(); af++ )
 		length += strlen( *af ) + 2;
-
-	char *command = new char[length];
-
-	sprintf( command, 
-		"gcc -Wall -Wwrite-strings"
-		" -I" PREFIX "/include"
-		" -g"
-		" -o %s"
+	for ( ArgsVector::Iter ip = includePaths; ip.lte(); ip++ )
+		length += strlen( *ip ) + 3;
+	for ( ArgsVector::Iter lp = libraryPaths; lp.lte(); lp++ )
+		length += strlen( *lp ) + 3;
+#define COMPILE_COMMAND_STRING "gcc -Wall -Wwrite-strings" \
+		" -g" \
+		" -o %s" \
 		" %s"
-		" -L" PREFIX "/lib"
-		" -lcolm",
-		binaryFn, intermedFn );
-	
+	char *command = new char[length];
+	if ( installed) {
+		sprintf( command,
+				COMPILE_COMMAND_STRING
+				" -I" PREFIX "/include"
+				" -L" PREFIX "/lib",
+				binaryFn, intermedFn );
+	}
+	else {
+		sprintf( command,
+				COMPILE_COMMAND_STRING
+				" -I%s/../aapl"
+				" -I%s/include"
+				" -L%s",
+				binaryFn, intermedFn, location, location, location );
+	}
+#undef COMPILE_COMMAND_STRING
 	for ( ArgsVector::Iter af = additionalCodeFiles; af.lte(); af++ ) {
 		strcat( command, " " );
 		strcat( command, *af );
 	}
-
-	compileOutputCommand( command );
-
-	delete[] command;
-}
-
-void compileOutputInSource( const char *argv0 )
-{
-	/* Find the location of the colm program that is executing. */
-	char *location = strdup( argv0 );
-	char *last = strrchr( location, '/' );
-	assert( last != 0 );
-	last[0] = 0;
-
-	int length = 1024 + 3 * strlen(location) + strlen(intermedFn) + strlen(binaryFn);
-
-	for ( ArgsVector::Iter af = additionalCodeFiles; af.lte(); af++ )
-		length += strlen( *af ) + 2;
-
-	char *command = new char[length];
-	sprintf( command, 
-		"gcc -Wall -Wwrite-strings"
-		" -I%s/../aapl"
-		" -I%s/include"
-		" -g"
-		" -o %s"
-		" %s"
-		" -L%s"
-		" -lcolm",
-		location, location,
-		binaryFn, intermedFn, location );
-
-	for ( ArgsVector::Iter af = additionalCodeFiles; af.lte(); af++ ) {
-		strcat( command, " " );
-		strcat( command, *af );
+	for ( ArgsVector::Iter ip = includePaths; ip.lte(); ip++ ) {
+		strcat( command, " -I" );
+		strcat( command, *ip );
 	}
-	
+	for ( ArgsVector::Iter lp = libraryPaths; lp.lte(); lp++ ) {
+		strcat( command, " -L" );
+		strcat( command, *lp );
+	}
+	strcat( command, " -lcolm" );
+
 	compileOutputCommand( command );
 
 	delete[] command;
@@ -511,7 +509,7 @@ bool inSourceTree( const char *argv0 )
 
 void processArgs( int argc, const char **argv )
 {
-	ParamCheck pc( "cD:e:x:I:vdlio:S:M:vHh?-:sVa:m:b:", argc, argv );
+	ParamCheck pc( "cD:e:x:I:L:vdlio:S:M:vHh?-:sVa:m:b:E:", argc, argv );
 
 	while ( pc.check() ) {
 		switch ( pc.state ) {
@@ -529,6 +527,9 @@ void processArgs( int argc, const char **argv )
 				break;
 			case 'l':
 				logging = true;
+				break;
+			case 'L':
+				libraryPaths.append( pc.parameterArg );
 				break;
 			case 'i':
 				branchPointInfo = true;
@@ -575,7 +576,7 @@ void processArgs( int argc, const char **argv )
 					exit(0);
 				}
 				else {
-					error() << "--" << pc.parameterArg << 
+					error() << "--" << pc.parameterArg <<
 							" is an invalid argument" << endl;
 				}
 				break;
@@ -595,30 +596,46 @@ void processArgs( int argc, const char **argv )
 				commitCodeFn = pc.parameterArg;
 				break;
 
+			case 'E': {
+				const char *eq = strchr( pc.parameterArg, '=' );
+				if ( eq == 0 )
+					fatal( "-E option argument must contain =" );
+				if ( eq == pc.parameterArg )
+					fatal( "-E variable name is of zero length" );
+
+				defineArgs.append( DefineArg(
+						String( pc.parameterArg, eq-pc.parameterArg ),
+						String( eq + 1 ) ) );
+
+				break;
+			}
+
 			case 'D':
 #if DEBUG
-				if ( strcmp( pc.parameterArg, "BYTECODE" ) == 0 )
+				// @NOTE: keep this in sync with 'debug.c': 'colm_realm_names'
+				if ( strcmp( pc.parameterArg, colm_realm_names[0] ) == 0 )
 					gblActiveRealm |= REALM_BYTECODE;
-				else if ( strcmp( pc.parameterArg, "PARSE" ) == 0 )
+				else if ( strcmp( pc.parameterArg, colm_realm_names[1] ) == 0 )
 					gblActiveRealm |= REALM_PARSE;
-				else if ( strcmp( pc.parameterArg, "MATCH" ) == 0 )
+				else if ( strcmp( pc.parameterArg, colm_realm_names[2] ) == 0 )
 					gblActiveRealm |= REALM_MATCH;
-				else if ( strcmp( pc.parameterArg, "COMPILE" ) == 0 )
+				else if ( strcmp( pc.parameterArg, colm_realm_names[3] ) == 0 )
 					gblActiveRealm |= REALM_COMPILE;
-				else if ( strcmp( pc.parameterArg, "POOL" ) == 0 )
+				else if ( strcmp( pc.parameterArg, colm_realm_names[4] ) == 0 )
 					gblActiveRealm |= REALM_POOL;
-				else if ( strcmp( pc.parameterArg, "PRINT" ) == 0 )
+				else if ( strcmp( pc.parameterArg, colm_realm_names[5] ) == 0 )
 					gblActiveRealm |= REALM_PRINT;
-				else if ( strcmp( pc.parameterArg, "INPUT" ) == 0 )
+				else if ( strcmp( pc.parameterArg, colm_realm_names[6] ) == 0 )
 					gblActiveRealm |= REALM_INPUT;
-				else if ( strcmp( pc.parameterArg, "SCAN" ) == 0 )
+				else if ( strcmp( pc.parameterArg, colm_realm_names[7] ) == 0 )
 					gblActiveRealm |= REALM_SCAN;
 				else
 					fatal( "unknown argument to -D %s\n", pc.parameterArg );
 #else
 				fatal( "-D option specified but debugging messsages not compiled in\n" );
 #endif
-				
+				break;
+
 			}
 			break;
 
@@ -667,10 +684,10 @@ int main(int argc, const char **argv)
 		exit(1);
 
 	/* Make sure we are not writing to the same file as the input file. */
-	if ( inputFn != 0 && outputFn != 0 && 
+	if ( inputFn != 0 && outputFn != 0 &&
 			strcmp( inputFn, outputFn  ) == 0 )
 	{
-		error() << "output file \"" << outputFn  << 
+		error() << "output file \"" << outputFn  <<
 				"\" is the same as the input file" << endl;
 	}
 
@@ -728,9 +745,9 @@ int main(int argc, const char **argv)
 
 		if ( !gblLibrary ) {
 			if ( inSourceTree( argv[0] ) )
-				compileOutputInSource( argv[0] );
+				compileOutput( argv[0], false );
 			else
-				compileOutputInstalled( argv[0] );
+				compileOutput( argv[0], true );
 		}
 
 		if ( exportHeaderFn != 0 ) {
